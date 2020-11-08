@@ -4,8 +4,10 @@ const commands: Array<Command> = [
   {
     file: 'ping',
     name: 'Ping',
-    inputs: ['h', 'help'],
+    inputs: ['ping'],
     dev: false,
     mod: false,
   }
 ]
+
+module.exports = commands;

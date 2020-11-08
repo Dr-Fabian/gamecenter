@@ -13,7 +13,10 @@ const $: App = {
   modules: loadModules(),
 };
 
-bot.once('ready', function(): void {
+bot.on('message', (msg: Message) => $.modules.message(msg, $));
+
+bot.once('ready', function (): void {
+  bot.user.setActivity({ name: 'Type in`gc help` to get help.\nYou look beatiful today 🕊!' });
   console.log(`${info} Bot connected!`);
 });
 
