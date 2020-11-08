@@ -14,6 +14,13 @@ const commands: Array<Command> = [
     inputs: ['h', 'help'],
     dev: false,
     mod: false
+  },
+  {
+    file: 'blackjack',
+    name: 'Blackjack',
+    inputs: ['bj', 'blackjack'],
+    dev: false,
+    mod: false
   }
 ]
 
