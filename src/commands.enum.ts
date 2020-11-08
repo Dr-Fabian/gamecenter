@@ -7,6 +7,13 @@ const commands: Array<Command> = [
     inputs: ['ping'],
     dev: false,
     mod: false,
+  },
+  {
+    file: 'help',
+    name: 'Help',
+    inputs: ['h', 'help'],
+    dev: false,
+    mod: false
   }
 ]
 
