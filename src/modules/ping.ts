@@ -2,6 +2,7 @@ import { Message, MessageEmbed } from "discord.js";
 import App from "../interfaces/app.interface";
 
 module.exports = (msg: Message, $: App): void => {
+  msg.channel.startTyping();
   msg.channel.send(
     new MessageEmbed()
       .setAuthor(`Requested by: ${msg.author.username}!`, msg.author.avatarURL())
@@ -11,4 +12,5 @@ module.exports = (msg: Message, $: App): void => {
       •Discord API: *${msg.guild.me.user.client.ws.ping}ms*...
       `)
   );
+  msg.channel.stopTyping();
 }

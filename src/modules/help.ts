@@ -5,6 +5,7 @@ module.exports = (msg: Message, $: App) => {
   const args: Array<string> = msg.content.trim().split(' ');
   args.splice(0, 2);
 
+  msg.channel.startTyping();
   if (args.length == 0) {
     const embed: MessageEmbed = new MessageEmbed()
       .setAuthor(`Requested by: ${msg.author.username}!`, msg.author.avatarURL())
@@ -26,4 +27,5 @@ module.exports = (msg: Message, $: App) => {
       .addField(`Commands:`, 'Lorem Ipsum.............');
     msg.channel.send(embed);
   }
+  msg.channel.stopTyping();
 }; 
