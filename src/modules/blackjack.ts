@@ -2,7 +2,7 @@ import { Collection, GuildMember, Message, MessageEmbed, MessageReaction } from 
 import App from "../interfaces/app.interface";
 
 
-function createEmbed(msg: Message, member: GuildMember, playerCards: Array<any>, botCards: Array<any>, playerWeight: number, botWeight: number) {
+function createEmbed(msg: Message, member: GuildMember, playerCards: Array<any>, botCards: Array<any>, playerWeight: number, botWeight: number, state: string) {
   
   let playerCardsAsString: string = 'null';
   let botCardsAsString: string = 'null';
@@ -24,14 +24,30 @@ function createEmbed(msg: Message, member: GuildMember, playerCards: Array<any>,
     .setTitle('Blackjack')
     .setDescription(`Dont know how to play Blackjack? You can learn the rules [here](https://google.com)!`)
     .addField(`You: **${playerWeight}** points.`, playerCardsAsString, true)
-    .addField(`Opponent: **${botWeight} points.**`, botCardsAsString, true);
+    .addField(`Opponent: **${botWeight} points.**`, botCardsAsString, true)
+
+  if(state == 'lost') {
+    embed.addField('State:', `<@${member.user.id}>: **Unfortunately, you lost!**`);
+  };
+
+  if(state == 'won') {
+    embed.addField('State:', `<@${member.user.id}>: **We got a winner!**`);
+  };
+
+  if(state == 'tie') {
+    embed.addField('State:', `<@${member.user.id}>: **That's a tie!**`);
+  };
+
+  if(state == 'lost-first-round') {
+    embed.addField('State:', `<@${member.user.id}>: **What a crime, you lost first round!**`);
+  };
 
   return embed;
 };
 
 module.exports = async (msg: Message, $: App) => {
   msg.channel.startTyping();
-  const embed: MessageEmbed = createEmbed(msg, msg.member, null, null, null, null);
+  const embed: MessageEmbed = createEmbed(msg, msg.member, null, null, null, null, 'ongoing');
 
   const message: Message = await msg.channel.send(embed);
   new BlackJack(msg.member, message);
@@ -83,9 +99,11 @@ class BlackJack {
       this.botScore += card.weight;
       this.deck.splice(index, index+1);
     }
-    this.message.edit(createEmbed(this.message, this.member, this.playerHand, this.botHand, this.playerScore, this.botScore));
+    this.playerScore -= 1;
+    this.botScore -= 1;
+    this.message.edit(createEmbed(this.message, this.member, this.playerHand, this.botHand, this.playerScore, this.botScore, 'ongoing'));
     if (this.playerScore > 21) {
-      this.message.channel.send(`**Oh no! You lost first round... 🕊**`);
+      this.message.edit(createEmbed(this.message, this.member, this.playerHand, this.botHand, this.playerScore, this.botScore, 'lost-first-round'));
     } else {
       this.react();
       this.play();
@@ -123,11 +141,11 @@ class BlackJack {
         // Removes card from deck
         this.deck.splice(index, index+1);
         // Edits message
-        this.message.edit(createEmbed(this.message, this.member, this.playerHand, this.botHand, this.playerScore, this.botScore));
+        this.message.edit(createEmbed(this.message, this.member, this.playerHand, this.botHand, this.playerScore, this.botScore, 'ongoing'));
         // If points > 21
         if (this.playerScore > 21) {
           // Send defeat message.
-          this.message.channel.send(`<@${this.member.id}>: **Unfortunately, you lost! 🕊**`);
+          this.message.edit(createEmbed(this.message, this.member, this.playerHand, this.botHand, this.playerScore, this.botScore, 'lost'));
         } else {
           this.play();
           // Remove reactions and re-add them
@@ -139,20 +157,20 @@ class BlackJack {
         // If bot has better hand
         if (this.botScore > this.playerScore) {
           // Send lose message
-          this.message.channel.send(`<@${this.member.id}>: **Unfortunately, you lost! 🕊**`);
+          this.message.edit(createEmbed(this.message, this.member, this.playerHand, this.botHand, this.playerScore, this.botScore, 'lost'));
         } else {
           // While the bot has a worse hand than the player do
           while (this.botScore < this.playerScore || this.botScore == this.playerScore) {
             // If bot has a score superior to 21
             if (this.botScore > 21) {
               // Send win message
-              this.message.channel.send(`<@${this.member.id}>: **You won! 🦢**`);
+              this.message.edit(createEmbed(this.message, this.member, this.playerHand, this.botHand, this.playerScore, this.botScore, 'won'));
               break;
             };
             // Else if bot has a better hand than the player
             if (this.botScore > this.playerScore) {
               // Send defeat message
-              this.message.channel.send(`<@${this.member.id}>: **Unfortunately, you lost! 🕊**`);
+              this.message.edit(createEmbed(this.message, this.member, this.playerHand, this.botHand, this.playerScore, this.botScore, 'lost'));
               break;
             };
             // Pick card
@@ -161,22 +179,21 @@ class BlackJack {
             this.botHand.push(card);
             this.botScore += card.weight;
             this.deck.splice(index, index+1);
-            this.message.edit(createEmbed(this.message, this.member, this.playerHand, this.botHand, this.playerScore, this.botScore));
+            this.message.edit(createEmbed(this.message, this.member, this.playerHand, this.botHand, this.playerScore, this.botScore, 'ongoing'));
           };
-
           if (this.botScore > 21) {
             // Send win message
-            this.message.channel.send(`<@${this.member.id}>: **You won! 🦢**`);
+            this.message.edit(createEmbed(this.message, this.member, this.playerHand, this.botHand, this.playerScore, this.botScore, 'won'));
           };
 
-          if (this.botScore > this.playerScore && this.botScore < 21) {
+          if (this.botScore > this.playerScore && this.botScore <= 21) {
             // Send defeat message
-            this.message.channel.send(`<@${this.member.id}>: **Unfortunately you lost! 🕊**`);
+            this.message.edit(createEmbed(this.message, this.member, this.playerHand, this.botHand, this.playerScore, this.botScore, 'lost'));
           };
 
           if (this.botScore == this.playerScore) {
             // Send tie message
-            this.message.channel.send(`<@${this.member.id}>: **IT'S A TIE!**`);
+            this.message.edit(createEmbed(this.message, this.member, this.playerHand, this.botHand, this.playerScore, this.botScore, 'tie'));
           };
         };
       };
