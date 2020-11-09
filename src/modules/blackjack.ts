@@ -1,54 +1,185 @@
 import { Collection, GuildMember, Message, MessageEmbed, MessageReaction } from "discord.js";
 import App from "../interfaces/app.interface";
 
-module.exports = async (msg: Message, $: App) => {
-  msg.channel.startTyping();
+
+function createEmbed(msg: Message, member: GuildMember, playerCards: Array<any>, botCards: Array<any>, playerWeight: number, botWeight: number) {
+  
+  let playerCardsAsString: string = 'null';
+  let botCardsAsString: string = 'null';
+  
+  if (playerCards != null && botCards != null) {
+    playerCardsAsString = '';
+    for(let i: number = 0; i < playerCards.length; i++) {
+      playerCardsAsString += ` ${playerCards[i].card} `;
+    };
+    botCardsAsString = '';
+    for(let i: number = 0; i < botCards.length; i++) {
+      botCardsAsString += ` ${botCards[i].card} `;
+    };
+  };
+
   const embed: MessageEmbed = new MessageEmbed()
-    .setAuthor(`Playing with ${msg.author.username}!`, msg.author.avatarURL())
+    .setAuthor(`Playing with ${member.user.username}!`, member.user.avatarURL())
     .setColor("#000000")
     .setTitle('Blackjack')
-    .setDescription(`You can learn the rules [here](https://google.com)!`)
-    .addField('You', '[CARDS]', true)
-    .addField('Opponent', `[CARDS]`, true);
+    .setDescription(`Dont know how to play Blackjack? You can learn the rules [here](https://google.com)!`)
+    .addField(`You: **${playerWeight}** points.`, playerCardsAsString, true)
+    .addField(`Opponent: **${botWeight} points.**`, botCardsAsString, true);
+
+  return embed;
+};
+
+module.exports = async (msg: Message, $: App) => {
+  msg.channel.startTyping();
+  const embed: MessageEmbed = createEmbed(msg, msg.member, null, null, null, null);
 
   const message: Message = await msg.channel.send(embed);
-  const game: BlackJack = new BlackJack(msg.member, message);
-  game.react();
-  game.awaitMove();
+  new BlackJack(msg.member, message);
   msg.channel.stopTyping();
-}
+};
 
-
-
-
+// Itaque egressi sumus incedentes, arma ad manum, patriam defendere. Fatum fuit nostri.
 
 class BlackJack {
 
   private member: GuildMember;
   private message: Message;
+  private suits: Array<string> = ['♥️', '♠️', '♢', '♣️']
+  private values: Array<string> = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+  private weights: Array<number> = [2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10, 11];
+  private deck: Array<any> = new Array<any>();
+  private botHand: Array<any> = new Array<any>();
+  private botScore: number = 1;
+  private playerHand: Array<any> = new Array<any>();
+  private playerScore: number = 1;
 
   constructor(targetMember: GuildMember, targetMessage: Message) {
+
+    // Sets up default data
     this.member = targetMember;
     this.message = targetMessage;
-  }
 
+    // Create Deck
+    for (let k: number = 0; k < this.suits.length; k++) {
+      for(let j: number = 0; j < this.values.length; j++) {
+        this.deck.push({ card: `${this.suits[k]} ${this.values[j]}`, weight: this.weights[j] });
+      };
+    };
+
+    // Create player's hand
+    for (let i: number = 0; i < 2; i++) {
+      let index: number = Math.floor(Math.random() * this.deck.length);
+      let card: any = this.deck[index];
+      this.playerHand.push(card);
+      this.playerScore += card.weight;
+      this.deck.splice(index, index+1);
+    };
+
+    // Create bot's hand
+    for (let i: number = 0; i < 2; i++) {
+      let index: number = Math.floor(Math.random() * this.deck.length);
+      let card: any = this.deck[index];
+      this.botHand.push(card);
+      this.botScore += card.weight;
+      this.deck.splice(index, index+1);
+    }
+    this.message.edit(createEmbed(this.message, this.member, this.playerHand, this.botHand, this.playerScore, this.botScore));
+    if (this.playerScore > 21) {
+      this.message.channel.send(`**Oh no! You lost first round... 🕊**`);
+    } else {
+      this.react();
+      this.play();
+    };
+  };
+
+  // Reacts
   public react(): void {
     this.message.react('✅');
     this.message.react('❌');
-  }
+  };
 
-  public awaitMove(): void {
+  // Waits for player to play
+  public play(): void {
+
+    // Waits for specific reactions from specific member
     this.message.awaitReactions(
       (reactions: MessageReaction, member: GuildMember): boolean => member.id == this.member.id && (reactions.emoji.name == '✅' || reactions.emoji.name == '❌'),
       { max: 1, time: 20000 }
     )
     .then((collected: Collection<string, MessageReaction>): void => {
+      // Nothing collected
       if(collected.size == 0) {
         this.message.delete();
         this.message.channel.send(`**🔴 You didn't play!**`);
-      }
-      this.message.reactions.removeAll();
-    });
-  }
+      // If hit
+      } else if (collected.first().emoji.name == '✅') {
+        // Gets random card
+        let index: number = Math.floor(Math.random() * this.deck.length);
+        let card: any = this.deck[index];
+        // Adds card to player hand
+        this.playerHand.push(card);
+        // Adds score to player
+        this.playerScore += card.weight;
+        // Removes card from deck
+        this.deck.splice(index, index+1);
+        // Edits message
+        this.message.edit(createEmbed(this.message, this.member, this.playerHand, this.botHand, this.playerScore, this.botScore));
+        // If points > 21
+        if (this.playerScore > 21) {
+          // Send defeat message.
+          this.message.channel.send(`<@${this.member.id}>: **Unfortunately, you lost! 🕊**`);
+        } else {
+          this.play();
+          // Remove reactions and re-add them
+          this.message.reactions.removeAll();
+          this.react();
+        };
+      // If stop
+      } else if (collected.first().emoji.name == '❌') {
+        // If bot has better hand
+        if (this.botScore > this.playerScore) {
+          // Send lose message
+          this.message.channel.send(`<@${this.member.id}>: **Unfortunately, you lost! 🕊**`);
+        } else {
+          // While the bot has a worse hand than the player do
+          while (this.botScore < this.playerScore || this.botScore == this.playerScore) {
+            // If bot has a score superior to 21
+            if (this.botScore > 21) {
+              // Send win message
+              this.message.channel.send(`<@${this.member.id}>: **You won! 🦢**`);
+              break;
+            };
+            // Else if bot has a better hand than the player
+            if (this.botScore > this.playerScore) {
+              // Send defeat message
+              this.message.channel.send(`<@${this.member.id}>: **Unfortunately, you lost! 🕊**`);
+              break;
+            };
+            // Pick card
+            let index: number = Math.floor(Math.random() * this.deck.length);
+            let card: any = this.deck[index];
+            this.botHand.push(card);
+            this.botScore += card.weight;
+            this.deck.splice(index, index+1);
+            this.message.edit(createEmbed(this.message, this.member, this.playerHand, this.botHand, this.playerScore, this.botScore));
+          };
 
-}
+          if (this.botScore > 21) {
+            // Send win message
+            this.message.channel.send(`<@${this.member.id}>: **You won! 🦢**`);
+          };
+
+          if (this.botScore > this.playerScore && this.botScore < 21) {
+            // Send defeat message
+            this.message.channel.send(`<@${this.member.id}>: **Unfortunately you lost! 🕊**`);
+          };
+
+          if (this.botScore == this.playerScore) {
+            // Send tie message
+            this.message.channel.send(`<@${this.member.id}>: **IT'S A TIE!**`);
+          };
+        };
+      };
+    });
+  };
+};
